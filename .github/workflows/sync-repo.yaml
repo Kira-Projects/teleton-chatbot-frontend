@@ -21,5 +21,5 @@ jobs:
         run: |
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
-          git remote add kirovich-ai-repo git@github.com:kirovich-ai/kirovich-landing.git
+          git remote add kirovich-ai-repo git@github.com:kirovich-ai/teleton-chatbot-frontend.git
           git push -f -u kirovich-ai-repo main
