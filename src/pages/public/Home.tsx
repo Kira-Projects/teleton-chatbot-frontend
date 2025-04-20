@@ -1,9 +1,8 @@
 import { useState } from 'react'
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetHeader, SheetTrigger } from "@/components/ui/sheet"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { MessageCircle, Menu, X } from "lucide-react"
-import ChatBot from '@/components/ChatBot'
+import { Menu, X } from "lucide-react"
+
 
 const Home = () => {
     const [isMenuOpen, setIsMenuOpen] = useState(false)
@@ -112,24 +111,7 @@ const Home = () => {
   
   
         {/* Fixed Chat Button */}
-        <Dialog>
-          <DialogTrigger asChild>
-            <Button
-              className="fixed bottom-6 right-6 rounded-full w-16 h-16 bg-[#E84855] hover:bg-[#d13844] z-50"
-              size="icon"
-            >
-              <MessageCircle className="h-8 w-8" />
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[425px]">
-            <DialogHeader>
-              <DialogTitle>Chat con Teletón</DialogTitle>
-            </DialogHeader>
-            <div className="h-[600px]">
-              <ChatBot />
-            </div>
-          </DialogContent>
-        </Dialog>
+#
       </div>
     )
 };
