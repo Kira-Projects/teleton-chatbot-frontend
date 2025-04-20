@@ -4,10 +4,26 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicontel.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Botathon Grupo 6</title>
+    <title>Teleton</title>
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <script>
+      (function(d,t) {
+        var BASE_URL="https://35-209-218-178.sslip.io";
+        var g=d.createElement(t),s=d.getElementsByTagName(t)[0];
+        g.src=BASE_URL+"/packs/js/sdk.js";
+        g.defer = true;
+        g.async = true;
+        s.parentNode.insertBefore(g,s);
+        g.onload=function(){
+          window.chatwootSDK.run({
+            websiteToken: 'fsMsVhng4xnxB6putbGsagyR',
+            baseUrl: BASE_URL
+          })
+        }
+      })(document,"script");
+    </script>
   </body>
 </html>
