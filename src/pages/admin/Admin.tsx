@@ -249,20 +249,14 @@ const Admin = () => {
 
       {/* Estado de la KB */}
       <div className="mb-8 flex items-center gap-4">
-        <Badge
-          variant={kbStatus.rag_system_loaded ? "success" : "destructive"}
-          className="px-3 py-1"
-        >
+        <Badge className="px-3 py-1">
           {kbStatus.rag_system_loaded
             ? "Sistema RAG cargado"
             : "Sistema RAG no cargado"}
         </Badge>
 
         {kbStatus.is_generating && (
-          <Badge
-            variant="warning"
-            className="px-3 py-1 flex items-center gap-2"
-          >
+          <Badge className="px-3 py-1 flex items-center gap-2">
             <RefreshCcw className="w-4 h-4 animate-spin" />
             Generando base de conocimiento
           </Badge>
