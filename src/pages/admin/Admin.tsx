@@ -21,9 +21,10 @@ import {
   HardDrive,
   AlertCircle,
 } from "lucide-react"
+import { config } from "@/config"
 
 // URL base de la API
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000"
+const API_BASE_URL = config.REST_API
 
 interface SupportConfig {
   support_email: string
