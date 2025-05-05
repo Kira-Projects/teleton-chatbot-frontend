@@ -11,7 +11,6 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import {
@@ -134,62 +133,6 @@ const Admin = () => {
       })
     } finally {
       setIsLoading({ ...isLoading, savingConfig: false })
-    }
-  }
-
-  // Generar base de conocimiento
-  const generateKnowledgeBase = async () => {
-    try {
-      setIsLoading({ ...isLoading, generatingKB: true })
-      await axios.post(`${API_BASE_URL}/generate-kb`)
-      setMessages({
-        ...messages,
-        generateKB: {
-          text: "Generación de base de conocimiento iniciada",
-          type: "success",
-        },
-      })
-    } catch (error) {
-      console.error("Error al iniciar generación de KB:", error)
-      setMessages({
-        ...messages,
-        generateKB: {
-          text: "Error al iniciar generación de base de conocimiento",
-          type: "error",
-        },
-      })
-    } finally {
-      setIsLoading({ ...isLoading, generatingKB: false })
-      // Recargar estado de la KB
-      setTimeout(() => loadKbStatus(), 2000)
-    }
-  }
-
-  // Cargar documentos de Google Drive
-  const loadFromGDrive = async () => {
-    try {
-      setIsLoading({ ...isLoading, loadingGDrive: true })
-      await axios.post(`${API_BASE_URL}/load-from-gdrive`)
-      setMessages({
-        ...messages,
-        loadGDrive: {
-          text: "Descarga de documentos de Google Drive iniciada",
-          type: "success",
-        },
-      })
-    } catch (error) {
-      console.error("Error al iniciar descarga desde Google Drive:", error)
-      setMessages({
-        ...messages,
-        loadGDrive: {
-          text: "Error al iniciar descarga desde Google Drive",
-          type: "error",
-        },
-      })
-    } finally {
-      setIsLoading({ ...isLoading, loadingGDrive: false })
-      // Recargar estado de la KB
-      setTimeout(() => loadKbStatus(), 2000)
     }
   }
 
