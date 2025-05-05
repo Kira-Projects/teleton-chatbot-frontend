@@ -300,7 +300,7 @@ const Admin = () => {
                 />
               </div>
 
-              <div className="space-y-2">
+              {/* <div className="space-y-2">
                 <Label htmlFor="fallback_message">Mensaje de fallback</Label>
                 <Textarea
                   id="fallback_message"
@@ -310,11 +310,10 @@ const Admin = () => {
                   placeholder="En estos momentos no dispongo de esa información..."
                   rows={4}
                 />
-                {/* Use {phone} para incluir el número de teléfono. */}
                 <p className="text-sm text-gray-500">
                   Use para incluir el número de teléfono.
                 </p>
-              </div>
+              </div> */}
             </div>
           </CardContent>
           <CardFooter className="flex justify-between">
