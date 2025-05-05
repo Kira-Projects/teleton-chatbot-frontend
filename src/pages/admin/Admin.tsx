@@ -350,7 +350,7 @@ const Admin = () => {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Database className="w-5 h-5" />
-              Gestión de Base de Conocimiento
+              Gestión de Base de Conocimiento (Uso Interno para desarrolladores)
             </CardTitle>
             <CardDescription>
               Administra la base de conocimiento del sistema RAG
@@ -361,8 +361,10 @@ const Admin = () => {
               <Button
                 className="w-full"
                 variant="default"
-                onClick={loadFromGDrive}
-                disabled={isLoading.loadingGDrive || kbStatus.is_generating}
+                onClick={() => {
+                  console.log("Descargar documentos de Google Drive")
+                }}
+                disabled={true}
               >
                 {isLoading.loadingGDrive ? (
                   <>
@@ -380,8 +382,10 @@ const Admin = () => {
               <Button
                 className="w-full"
                 variant="default"
-                onClick={generateKnowledgeBase}
-                disabled={isLoading.generatingKB || kbStatus.is_generating}
+                onClick={() => {
+                  console.log("Generar KB")
+                }}
+                disabled={true}
               >
                 {isLoading.generatingKB ? (
                   <>
