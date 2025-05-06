@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import axios from "axios"
 import {
   Card,
@@ -19,12 +19,20 @@ import {
   Mail,
   HardDrive,
   AlertCircle,
+  Upload,
+  FileText,
+  File,
+  FileSpreadsheet,
+  X,
 } from "lucide-react"
+import { Progress } from "@/components/ui/progress"
+import { useToast } from "../../hooks/use-toast"
 import { config } from "@/config"
 
 // URL base de la API
 const API_BASE_URL = config.REST_API
 
+// Types
 interface SupportConfig {
   support_email: string
   support_phone: string
@@ -39,7 +47,29 @@ interface UnansweredQuery {
   source: string
 }
 
+interface UploadedFile {
+  id: string
+  name: string
+  type: string
+  size: number
+  uploadDate: string
+  status: "uploaded" | "processing" | "processed" | "error"
+}
+
+interface KBStatus {
+  is_generating: boolean
+  rag_system_loaded: boolean
+  last_generation_time?: string
+  documents_count?: number
+}
+
 const Admin = () => {
+  // Toast notifications
+  const { toast } = useToast()
+
+  // Ref for file input
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
   // Estados para configuración de soporte
   const [supportConfig, setSupportConfig] = useState<SupportConfig>({
     support_email: "",
@@ -54,6 +84,7 @@ const Admin = () => {
     generatingKB: false,
     loadingGDrive: false,
     loadingQueries: false,
+    uploadingFiles: false,
   })
 
   // Estado para mensajes de operación
@@ -67,21 +98,31 @@ const Admin = () => {
   )
 
   // Estado para status de la KB
-  const [kbStatus, setKbStatus] = useState({
+  const [kbStatus, setKbStatus] = useState<KBStatus>({
     is_generating: false,
     rag_system_loaded: false,
   })
+
+  // Estado para archivos seleccionados
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([])
+
+  // Estado para archivos subidos
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([])
+
+  // Estado para progreso de subida
+  const [uploadProgress, setUploadProgress] = useState(0)
 
   // Cargar configuración al iniciar
   useEffect(() => {
     loadSupportConfig()
     loadKbStatus()
     loadUnansweredQueries()
+    loadUploadedFiles()
 
     // Verificar estado de la KB cada 10 segundos
     const intervalId = setInterval(() => {
       loadKbStatus()
-    }, 10000)
+    }, 100000)
 
     return () => clearInterval(intervalId)
   }, [])
@@ -122,6 +163,10 @@ const Admin = () => {
           type: "success",
         },
       })
+      toast({
+        title: "Configuración guardada",
+        description: "La configuración de soporte se ha guardado correctamente",
+      })
     } catch (error) {
       console.error("Error al guardar configuración:", error)
       setMessages({
@@ -131,8 +176,51 @@ const Admin = () => {
           type: "error",
         },
       })
+      toast({
+        title: "Error",
+        description: "No se pudo guardar la configuración de soporte",
+        variant: "destructive",
+      })
     } finally {
       setIsLoading({ ...isLoading, savingConfig: false })
+    }
+  }
+
+  // Generar base de conocimiento
+  const generateKnowledgeBase = async () => {
+    try {
+      setIsLoading({ ...isLoading, generatingKB: true })
+      await axios.post(`${API_BASE_URL}/generate-kb`, {})
+      setMessages({
+        ...messages,
+        generateKB: {
+          text: "Generación de base de conocimiento iniciada",
+          type: "success",
+        },
+      })
+      toast({
+        title: "Proceso iniciado",
+        description: "La generación de la base de conocimiento ha comenzado",
+      })
+    } catch (error) {
+      console.error("Error al iniciar generación de KB:", error)
+      setMessages({
+        ...messages,
+        generateKB: {
+          text: "Error al iniciar generación de base de conocimiento",
+          type: "error",
+        },
+      })
+      toast({
+        title: "Error",
+        description:
+          "No se pudo iniciar la generación de la base de conocimiento",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading({ ...isLoading, generatingKB: false })
+      // Recargar estado de la KB
+      setTimeout(() => loadKbStatus(), 2000)
     }
   }
 
@@ -141,8 +229,47 @@ const Admin = () => {
     try {
       const response = await axios.get(`${API_BASE_URL}/kb-status`)
       setKbStatus(response.data)
+
+      // Si la generación acaba de completarse
+      if (kbStatus.is_generating && !response.data.is_generating) {
+        if (response.data.rag_system_loaded) {
+          toast({
+            title: "Proceso completado",
+            description: "La base de conocimiento se ha generado correctamente",
+          })
+          // Mover archivos a carpeta de datos
+          moveProcessedFiles()
+        } else {
+          toast({
+            title: "Error en el proceso",
+            description: "Hubo un problema al generar la base de conocimiento",
+            variant: "destructive",
+          })
+        }
+
+        // Recargar la lista de archivos subidos
+        loadUploadedFiles()
+      }
     } catch (error) {
       console.error("Error al verificar estado de la KB:", error)
+    }
+  }
+
+  // Mover archivos procesados a la carpeta de datos
+  const moveProcessedFiles = async () => {
+    try {
+      await axios.post(`${API_BASE_URL}/move-processed-files`)
+      toast({
+        title: "Archivos movidos",
+        description: "Los documentos se han movido a la carpeta chatbot-data",
+      })
+    } catch (error) {
+      console.error("Error al mover archivos procesados:", error)
+      toast({
+        title: "Error",
+        description: "No se pudieron mover los archivos procesados",
+        variant: "destructive",
+      })
     }
   }
 
@@ -166,6 +293,16 @@ const Admin = () => {
     }
   }
 
+  // Cargar archivos subidos
+  const loadUploadedFiles = async () => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/uploaded-files`)
+      setUploadedFiles(response.data.files)
+    } catch (error) {
+      console.error("Error al cargar archivos subidos:", error)
+    }
+  }
+
   // Marcar consulta como procesada
   const markQueryAsProcessed = async (query: string) => {
     try {
@@ -185,6 +322,123 @@ const Admin = () => {
     setSupportConfig({ ...supportConfig, [name]: value })
   }
 
+  // Manejador de selección de archivos
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files || files.length === 0) return
+
+    // Validar tipos de archivos permitidos
+    const allowedTypes = [
+      "application/pdf", // PDF
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document", // DOCX
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", // XLSX
+    ]
+
+    const validFiles: File[] = []
+    const invalidFiles: string[] = []
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i]
+      if (allowedTypes.includes(file.type)) {
+        validFiles.push(file)
+      } else {
+        invalidFiles.push(file.name)
+      }
+    }
+
+    // Mostrar mensaje de error si hay archivos inválidos
+    if (invalidFiles.length > 0) {
+      toast({
+        title: "Archivos no permitidos",
+        description: `Solo se permiten archivos PDF, DOCX y XLSX. Archivos rechazados: ${invalidFiles.join(
+          ", "
+        )}`,
+        variant: "destructive",
+      })
+    }
+
+    // Actualizar lista de archivos seleccionados
+    setSelectedFiles((prevFiles) => [...prevFiles, ...validFiles])
+
+    // Limpiar el input para permitir seleccionar el mismo archivo nuevamente
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ""
+    }
+  }
+
+  // Remover archivo de la lista de seleccionados
+  const removeSelectedFile = (index: number) => {
+    setSelectedFiles((prevFiles) => prevFiles.filter((_, i) => i !== index))
+  }
+
+  // Subir archivos seleccionados
+  const uploadFiles = async () => {
+    if (selectedFiles.length === 0) return
+
+    try {
+      setIsLoading({ ...isLoading, uploadingFiles: true })
+      setUploadProgress(0)
+
+      // Crear FormData para la subida
+      const formData = new FormData()
+      selectedFiles.forEach((file) => {
+        formData.append("files", file)
+      })
+
+      // Configurar el progreso de la subida
+      const config = {
+        onUploadProgress: (progressEvent: any) => {
+          const percentCompleted = Math.round(
+            (progressEvent.loaded * 100) / progressEvent.total
+          )
+          setUploadProgress(percentCompleted)
+        },
+      }
+
+      // Enviar archivos al servidor
+      await axios.post(`${API_BASE_URL}/upload-files`, formData, config)
+
+      // Limpiar lista de archivos seleccionados
+      setSelectedFiles([])
+      setUploadProgress(0)
+
+      // Recargar lista de archivos subidos
+      loadUploadedFiles()
+
+      toast({
+        title: "Archivos subidos",
+        description: `${selectedFiles.length} archivo(s) subidos correctamente`,
+      })
+    } catch (error) {
+      console.error("Error al subir archivos:", error)
+      toast({
+        title: "Error",
+        description: "No se pudieron subir los archivos",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading({ ...isLoading, uploadingFiles: false })
+    }
+  }
+
+  // Formatear tamaño de archivo
+  const formatFileSize = (bytes: number): string => {
+    if (bytes < 1024) return bytes + " bytes"
+    else if (bytes < 1048576) return (bytes / 1024).toFixed(1) + " KB"
+    else return (bytes / 1048576).toFixed(1) + " MB"
+  }
+
+  // Obtener icono para tipo de archivo
+  const getFileIcon = (type: string) => {
+    if (type.includes("pdf"))
+      return <FileText className="w-5 h-5 text-red-500" />
+    else if (type.includes("wordprocessingml"))
+      return <File className="w-5 h-5 text-blue-500" />
+    else if (type.includes("spreadsheetml"))
+      return <FileSpreadsheet className="w-5 h-5 text-green-500" />
+    else return <File className="w-5 h-5" />
+  }
+
   return (
     <div className="container mx-auto py-8">
       <h1 className="text-3xl font-bold mb-6">
@@ -193,16 +447,28 @@ const Admin = () => {
 
       {/* Estado de la KB */}
       <div className="mb-8 flex items-center gap-4">
-        <Badge className="px-3 py-1">
+        <Badge
+          className={`px-3 py-1 ${
+            kbStatus.rag_system_loaded
+              ? "bg-green-100 text-green-800"
+              : "bg-yellow-100 text-yellow-800"
+          }`}
+        >
           {kbStatus.rag_system_loaded
             ? "Sistema RAG cargado"
             : "Sistema RAG no cargado"}
         </Badge>
 
         {kbStatus.is_generating && (
-          <Badge className="px-3 py-1 flex items-center gap-2">
+          <Badge className="px-3 py-1 flex items-center gap-2 bg-blue-100 text-blue-800">
             <RefreshCcw className="w-4 h-4 animate-spin" />
             Generando base de conocimiento
+          </Badge>
+        )}
+
+        {kbStatus.documents_count !== undefined && (
+          <Badge className="px-3 py-1 bg-purple-100 text-purple-800">
+            {kbStatus.documents_count} documentos indexados
           </Badge>
         )}
       </div>
@@ -215,9 +481,7 @@ const Admin = () => {
               <Mail className="w-5 h-5" />
               Configuración de Soporte
             </CardTitle>
-            <CardDescription>
-              Administra el correo de soporte y mensajes de fallback
-            </CardDescription>
+            <CardDescription>Administra el correo de soporte</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
@@ -242,21 +506,6 @@ const Admin = () => {
                   placeholder="+56912345678"
                 />
               </div>
-
-              {/* <div className="space-y-2">
-                <Label htmlFor="fallback_message">Mensaje de fallback</Label>
-                <Textarea
-                  id="fallback_message"
-                  name="fallback_message"
-                  value={supportConfig.fallback_message}
-                  onChange={handleInputChange}
-                  placeholder="En estos momentos no dispongo de esa información..."
-                  rows={4}
-                />
-                <p className="text-sm text-gray-500">
-                  Use para incluir el número de teléfono.
-                </p>
-              </div> */}
             </div>
           </CardContent>
           <CardFooter className="flex justify-between">
@@ -293,7 +542,7 @@ const Admin = () => {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Database className="w-5 h-5" />
-              Gestión de Base de Conocimiento (Uso Interno para desarrolladores)
+              Gestión de Base de Conocimiento
             </CardTitle>
             <CardDescription>
               Administra la base de conocimiento del sistema RAG
@@ -301,36 +550,156 @@ const Admin = () => {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              <Button
-                className="w-full"
-                variant="default"
-                onClick={() => {
-                  console.log("Descargar documentos de Google Drive")
-                }}
-                disabled={true}
-              >
-                {isLoading.loadingGDrive ? (
+              {/* Subida de archivos */}
+              <div className="p-4 border border-dashed rounded-lg">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-sm font-medium">Subir documentos</h3>
+                  <p className="text-xs text-gray-500">Solo PDF, DOCX, XLSX</p>
+                </div>
+
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleFileSelect}
+                  accept=".pdf,.docx,.xlsx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                  multiple
+                  className="hidden"
+                  disabled={kbStatus.is_generating || isLoading.uploadingFiles}
+                />
+
+                <Button
+                  variant="outline"
+                  className="w-full mb-2"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={kbStatus.is_generating || isLoading.uploadingFiles}
+                >
+                  <Upload className="mr-2 h-4 w-4" /> Seleccionar archivos
+                </Button>
+
+                {/* Lista de archivos seleccionados */}
+                {selectedFiles.length > 0 && (
+                  <div className="space-y-2 mt-2 mb-3">
+                    <p className="text-xs font-medium">
+                      Archivos seleccionados:
+                    </p>
+                    {selectedFiles.map((file, index) => (
+                      <div
+                        key={index}
+                        className="flex items-center justify-between p-2 bg-gray-50 rounded-md text-sm"
+                      >
+                        <div className="flex items-center">
+                          {getFileIcon(file.type)}
+                          <span className="ml-2 truncate max-w-[180px]">
+                            {file.name}
+                          </span>
+                          <span className="ml-2 text-xs text-gray-500">
+                            {formatFileSize(file.size)}
+                          </span>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeSelectedFile(index)}
+                          disabled={isLoading.uploadingFiles}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Botón para subir */}
+                {selectedFiles.length > 0 && (
                   <>
-                    <RefreshCcw className="mr-2 h-4 w-4 animate-spin" />{" "}
-                    Descargando...
-                  </>
-                ) : (
-                  <>
-                    <HardDrive className="mr-2 h-4 w-4" /> Descargar Documentos
-                    de Google Drive
+                    <Button
+                      variant="default"
+                      className="w-full"
+                      onClick={uploadFiles}
+                      disabled={
+                        isLoading.uploadingFiles || kbStatus.is_generating
+                      }
+                    >
+                      {isLoading.uploadingFiles ? (
+                        <>
+                          <RefreshCcw className="mr-2 h-4 w-4 animate-spin" />{" "}
+                          Subiendo...
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="mr-2 h-4 w-4" /> Subir{" "}
+                          {selectedFiles.length} archivo(s)
+                        </>
+                      )}
+                    </Button>
+
+                    {/* Barra de progreso */}
+                    {isLoading.uploadingFiles && (
+                      <Progress value={uploadProgress} className="mt-2" />
+                    )}
                   </>
                 )}
-              </Button>
+              </div>
 
+              {/* Lista de archivos subidos */}
+              {uploadedFiles.length > 0 && (
+                <div className="space-y-2">
+                  <h3 className="text-sm font-medium">
+                    Documentos subidos ({uploadedFiles.length})
+                  </h3>
+                  <ScrollArea className="h-[150px] rounded-md border p-2">
+                    {uploadedFiles.map((file) => (
+                      <div
+                        key={file.id}
+                        className="flex items-center justify-between p-2 border-b text-sm"
+                      >
+                        <div className="flex items-center">
+                          {getFileIcon(file.type)}
+                          <span className="ml-2 truncate max-w-[180px]">
+                            {file.name}
+                          </span>
+                        </div>
+                        <Badge
+                          variant="outline"
+                          className={`
+                            ${
+                              file.status === "uploaded"
+                                ? "bg-blue-50 text-blue-800"
+                                : ""
+                            }
+                            ${
+                              file.status === "processing"
+                                ? "bg-yellow-50 text-yellow-800"
+                                : ""
+                            }
+                            ${
+                              file.status === "processed"
+                                ? "bg-green-50 text-green-800"
+                                : ""
+                            }
+                            ${
+                              file.status === "error"
+                                ? "bg-red-50 text-red-800"
+                                : ""
+                            }
+                          `}
+                        >
+                          {file.status}
+                        </Badge>
+                      </div>
+                    ))}
+                  </ScrollArea>
+                </div>
+              )}
+
+              {/* Botón para generar KB */}
               <Button
                 className="w-full"
                 variant="default"
-                onClick={() => {
-                  console.log("Generar KB")
-                }}
-                disabled={true}
+                onClick={generateKnowledgeBase}
+                disabled={kbStatus.is_generating || isLoading.uploadingFiles}
               >
-                {isLoading.generatingKB ? (
+                {kbStatus.is_generating ? (
                   <>
                     <RefreshCcw className="mr-2 h-4 w-4 animate-spin" />{" "}
                     Generando...
@@ -352,18 +721,6 @@ const Admin = () => {
                   }`}
                 >
                   {messages.generateKB.text}
-                </div>
-              )}
-
-              {messages.loadGDrive && (
-                <div
-                  className={`p-3 rounded text-sm ${
-                    messages.loadGDrive.type === "success"
-                      ? "bg-green-100 text-green-800"
-                      : "bg-red-100 text-red-800"
-                  }`}
-                >
-                  {messages.loadGDrive.text}
                 </div>
               )}
             </div>
