@@ -1,0 +1,9 @@
+{
+  "status": "processing",
+  "message": "Generando base de conocimiento en segundo plano",
+  "config": {
+    "data_path": "I:\\leandrocode\\dev\\projects\\3_personal_real_projects\\teleton-chatbot\\teleton-chatbot-backend\\data\\books",
+    "chunk_size": 1000,
+    "chunk_overlap": 250
+  }
+}
