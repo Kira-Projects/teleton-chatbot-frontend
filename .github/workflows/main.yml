@@ -9,18 +9,19 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
-
       - name: Deploy to GCP VM
         uses: appleboy/ssh-action@v1.0.0
         with:
           host: 34.132.204.3
           username: vce923
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          passphrase: ${{ secrets.SSH_PASSPHRASE }}
           script: |
-            sudo su -
-            cd teleton-chatbot-frontend/
-            git pull
-            npm run build
-            sudo cp -R dist/* /var/www/teleton/
-            sudo systemctl restart nginx
+            # Using a single sudo command with the full script
+            sudo bash -c '
+              cd /root/frontend-teleton/teleton-chatbot-frontend &&
+              git pull &&
+              npm run build &&
+              cp -R dist/* /var/www/teleton/ &&
+              systemctl daemon-reload &&
+              systemctl restart nginx
+            '
