@@ -1,0 +1,25 @@
+name: Deploy to GCP VM
+on:
+  # push:
+  #   branches: [ main ]
+  workflow_dispatch: # Permite ejecutar el workflow manualmente (on demand)
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Deploy to GCP VM
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: 34.132.204.3
+          username: vce923
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          passphrase: ${{ secrets.SSH_PASSPHRASE }}
+          script: |
+            cd teleton-chatbot-frontend/
+            git pull
+            npm run build
+            sudo cp -R dist/* /var/www/teleton/
+            sudo systemctl restart nginx
