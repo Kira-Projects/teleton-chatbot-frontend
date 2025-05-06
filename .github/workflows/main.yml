@@ -1,8 +1,6 @@
 name: Deploy to GCP VM
 on:
-  # push:
-  #   branches: [ main ]
-  workflow_dispatch: # Permite ejecutar el workflow manualmente (on demand)
+  workflow_dispatch:
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -15,8 +13,8 @@ jobs:
           host: 34.132.204.3
           username: vce923
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+          passphrase: ${{ secrets.SSH_PASSPHRASE }}  # Add this line with the passphrase
           script: |
-            # Using a single sudo command with the full script
             sudo bash -c '
               cd /root/frontend-teleton/teleton-chatbot-frontend &&
               git pull &&
