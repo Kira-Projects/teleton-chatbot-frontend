@@ -18,6 +18,7 @@ jobs:
             sudo bash -c '
               cd /root/frontend-teleton/teleton-chatbot-frontend &&
               git pull &&
+              npm start &&
               npm run build &&
               cp -R dist/* /var/www/teleton/ &&
               systemctl daemon-reload &&
