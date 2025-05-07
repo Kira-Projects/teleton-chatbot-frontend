@@ -103,7 +103,7 @@ const KBStatusMonitor = ({
   return (
     <div>
       <div className="flex items-center gap-4">
-        <Badge
+        {/* <Badge
           className={`px-3 py-1 ${
             kbStatus.rag_system_loaded
               ? "bg-green-100 text-green-800"
@@ -113,7 +113,7 @@ const KBStatusMonitor = ({
           {kbStatus.rag_system_loaded
             ? "Sistema RAG cargado"
             : "Sistema RAG no cargado"}
-        </Badge>
+        </Badge> */}
 
         {kbStatus.is_generating && (
           <Badge className="px-3 py-1 flex items-center gap-2 bg-blue-100 text-blue-800">
