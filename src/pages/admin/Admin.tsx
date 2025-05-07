@@ -129,7 +129,7 @@ const Admin = () => {
     return () => clearInterval(intervalId)
   }, [])
 
-  function sleep(ms) {
+  function sleep(ms: any) {
     return new Promise((resolve) => setTimeout(resolve, ms))
   }
 
