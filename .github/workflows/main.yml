@@ -27,6 +27,7 @@ jobs:
           script: |
             sudo bash -c '
               cd ${{ env.SERVER_DIR }} &&
+              git checkout
               git pull &&
               npm install &&
               npm run build &&
