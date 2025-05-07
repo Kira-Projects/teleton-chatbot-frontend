@@ -24,15 +24,15 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           passphrase: ${{ secrets.SSH_PASSPHRASE }}
           script_stop: true
-        script: |
-          sudo bash -c '
-            cd ${{ env.SERVER_DIR }} &&
-            git reset --hard &&
-            git checkout main &&
-            git pull &&
-            npm install &&
-            npm run build &&
-            cp -R dist/* ${{ env.DEPLOY_DIR }} &&
-            systemctl daemon-reload &&
-            systemctl restart nginx
-  '
+          script: |
+            sudo bash -c '
+              cd ${{ env.SERVER_DIR }} &&
+              git reset --hard &&
+              git checkout main &&
+              git pull &&
+              npm install &&
+              npm run build &&
+              cp -R dist/* ${{ env.DEPLOY_DIR }} &&
+              systemctl daemon-reload &&
+              systemctl restart nginx
+            '
