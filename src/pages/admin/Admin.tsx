@@ -17,7 +17,6 @@ import {
   RefreshCcw,
   Database,
   Mail,
-  // HardDrive,
   AlertCircle,
   Upload,
   FileText,
@@ -28,6 +27,7 @@ import {
 import { Progress } from "@/components/ui/progress"
 import { useToast } from "../../hooks/use-toast"
 import { config } from "@/config"
+import KBStatusMonitor from "./KBStatusMonitor" // Import the new component
 
 // URL base de la API
 const API_BASE_URL = config.REST_API
@@ -59,7 +59,7 @@ interface UploadedFile {
 interface KBStatus {
   is_generating: boolean
   rag_system_loaded: boolean
-  last_generation_time?: Date
+  last_generation_time?: string
   documents_count?: number
 }
 
@@ -97,12 +97,11 @@ const Admin = () => {
     []
   )
 
-  // Estado para status de la KB
+  // Estado para KB status (will be updated by the KBStatusMonitor)
   const [kbStatus, setKbStatus] = useState<KBStatus>({
     is_generating: false,
     rag_system_loaded: false,
     documents_count: 0,
-    last_generation_time: new Date(),
   })
 
   // Estado para archivos seleccionados
@@ -117,20 +116,19 @@ const Admin = () => {
   // Cargar configuración al iniciar
   useEffect(() => {
     loadSupportConfig()
-    loadKbStatus()
     loadUnansweredQueries()
     loadUploadedFiles()
-
-    // Verificar estado de la KB cada 10 segundos
-    const intervalId = setInterval(() => {
-      loadKbStatus()
-    }, 10000)
-
-    return () => clearInterval(intervalId)
   }, [])
 
-  function sleep(ms: any) {
-    return new Promise((resolve) => setTimeout(resolve, ms))
+  // Handle KB status change from the monitor component
+  const handleStatusChange = (newStatus: KBStatus) => {
+    setKbStatus(newStatus)
+  }
+
+  // Handle generation complete event
+  const handleGenerationComplete = () => {
+    // Reload uploaded files when generation completes
+    loadUploadedFiles()
   }
 
   // Cargar configuración de soporte
@@ -208,9 +206,7 @@ const Admin = () => {
         title: "Proceso iniciado",
         description: "La generación de la base de conocimiento ha comenzado",
       })
-
-      await sleep(4000)
-      loadUploadedFiles()
+      loadUploadedFiles() // Refresh the uploaded files list after starting generation
     } catch (error) {
       console.error("Error al iniciar generación de KB:", error)
       setMessages({
@@ -228,42 +224,6 @@ const Admin = () => {
       })
     } finally {
       setIsLoading({ ...isLoading, generatingKB: false })
-      // Recargar estado de la KB
-      setTimeout(() => loadKbStatus(), 2000)
-    }
-  }
-
-  // Cargar estado de la KB
-  const loadKbStatus = async () => {
-    try {
-      const response = await axios.get<KBStatus>(`${API_BASE_URL}/kb-status`)
-
-      console.log("kbStatus.is_generating:", kbStatus.is_generating)
-      console.log("response.data.is_generating:", response.data.is_generating)
-      console.log(
-        "se cumple:",
-        kbStatus.is_generating && !response.data.is_generating
-      )
-      if (kbStatus.is_generating && !response.data.is_generating) {
-        console.log("me ejecuto")
-        toast({
-          title: "Proceso completado",
-          description: "La base de conocimiento se ha generado correctamente",
-        })
-
-        // Also reload uploaded files when generation is complete
-        await sleep(5000)
-        loadUploadedFiles()
-      }
-
-      // Then update the state
-      setKbStatus({
-        is_generating: response.data.is_generating,
-        rag_system_loaded: response.data.rag_system_loaded,
-        documents_count: response.data.documents_count,
-      })
-    } catch (error) {
-      console.error("Error al verificar estado de la KB:", error)
     }
   }
 
@@ -291,6 +251,7 @@ const Admin = () => {
   const loadUploadedFiles = async () => {
     try {
       const response = await axios.get(`${API_BASE_URL}/uploaded-files`)
+      console.log("Uploaded files:", response.data.files)
       setUploadedFiles(response.data.files)
     } catch (error) {
       console.error("Error al cargar archivos subidos:", error)
@@ -439,26 +400,12 @@ const Admin = () => {
         Panel de Administración - Teletón RAG
       </h1>
 
-      {/* Estado de la KB */}
-      <div className="mb-8 flex items-center gap-4">
-        {/* <Badge
-          className={`px-3 py-1 ${
-            kbStatus.rag_system_loaded
-              ? "bg-green-100 text-green-800"
-              : "bg-yellow-100 text-yellow-800"
-          }`}
-        >
-          {kbStatus.rag_system_loaded
-            ? "Sistema RAG cargado"
-            : "Sistema RAG no cargado"}
-        </Badge> */}
-
-        {kbStatus.is_generating && (
-          <Badge className="px-3 py-1 flex items-center gap-2 bg-blue-100 text-blue-800">
-            <RefreshCcw className="w-4 h-4 animate-spin" />
-            Generando base de conocimiento
-          </Badge>
-        )}
+      {/* Estado de la KB - Now using the KBStatusMonitor component */}
+      <div className="mb-8">
+        <KBStatusMonitor
+          onStatusChange={handleStatusChange}
+          onGenerationComplete={handleGenerationComplete}
+        />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
