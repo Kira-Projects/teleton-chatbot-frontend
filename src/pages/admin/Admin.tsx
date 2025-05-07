@@ -53,13 +53,13 @@ interface UploadedFile {
   type: string
   size: number
   uploadDate: string
-  status: "uploaded" | "processing" | "processed" | "error"
+  status: "uploaded" | "processing" | "processed" | "error" | "moved"
 }
 
 interface KBStatus {
   is_generating: boolean
   rag_system_loaded: boolean
-  last_generation_time?: string
+  last_generation_time?: Date
   documents_count?: number
 }
 
@@ -101,6 +101,8 @@ const Admin = () => {
   const [kbStatus, setKbStatus] = useState<KBStatus>({
     is_generating: false,
     rag_system_loaded: false,
+    documents_count: 0,
+    last_generation_time: new Date(),
   })
 
   // Estado para archivos seleccionados
@@ -122,10 +124,14 @@ const Admin = () => {
     // Verificar estado de la KB cada 10 segundos
     const intervalId = setInterval(() => {
       loadKbStatus()
-    }, 100000)
+    }, 10000)
 
     return () => clearInterval(intervalId)
   }, [])
+
+  function sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms))
+  }
 
   // Cargar configuración de soporte
   const loadSupportConfig = async () => {
@@ -202,6 +208,9 @@ const Admin = () => {
         title: "Proceso iniciado",
         description: "La generación de la base de conocimiento ha comenzado",
       })
+
+      await sleep(4000)
+      loadUploadedFiles()
     } catch (error) {
       console.error("Error al iniciar generación de KB:", error)
       setMessages({
@@ -227,49 +236,34 @@ const Admin = () => {
   // Cargar estado de la KB
   const loadKbStatus = async () => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/kb-status`)
-      setKbStatus(response.data)
+      const response = await axios.get<KBStatus>(`${API_BASE_URL}/kb-status`)
 
-      // Si la generación acaba de completarse
+      console.log("kbStatus.is_generating:", kbStatus.is_generating)
+      console.log("response.data.is_generating:", response.data.is_generating)
+      console.log(
+        "se cumple:",
+        kbStatus.is_generating && !response.data.is_generating
+      )
       if (kbStatus.is_generating && !response.data.is_generating) {
-        if (response.data.rag_system_loaded) {
-          toast({
-            title: "Proceso completado",
-            description: "La base de conocimiento se ha generado correctamente",
-          })
-          // Mover archivos a carpeta de datos
-          moveProcessedFiles()
-        } else {
-          toast({
-            title: "Error en el proceso",
-            description: "Hubo un problema al generar la base de conocimiento",
-            variant: "destructive",
-          })
-        }
+        console.log("me ejecuto")
+        toast({
+          title: "Proceso completado",
+          description: "La base de conocimiento se ha generado correctamente",
+        })
 
-        // Recargar la lista de archivos subidos
+        // Also reload uploaded files when generation is complete
+        await sleep(5000)
         loadUploadedFiles()
       }
+
+      // Then update the state
+      setKbStatus({
+        is_generating: response.data.is_generating,
+        rag_system_loaded: response.data.rag_system_loaded,
+        documents_count: response.data.documents_count,
+      })
     } catch (error) {
       console.error("Error al verificar estado de la KB:", error)
-    }
-  }
-
-  // Mover archivos procesados a la carpeta de datos
-  const moveProcessedFiles = async () => {
-    try {
-      await axios.post(`${API_BASE_URL}/move-processed-files`)
-      toast({
-        title: "Archivos movidos",
-        description: "Los documentos se han movido a la carpeta chatbot-data",
-      })
-    } catch (error) {
-      console.error("Error al mover archivos procesados:", error)
-      toast({
-        title: "Error",
-        description: "No se pudieron mover los archivos procesados",
-        variant: "destructive",
-      })
     }
   }
 
@@ -447,7 +441,7 @@ const Admin = () => {
 
       {/* Estado de la KB */}
       <div className="mb-8 flex items-center gap-4">
-        <Badge
+        {/* <Badge
           className={`px-3 py-1 ${
             kbStatus.rag_system_loaded
               ? "bg-green-100 text-green-800"
@@ -457,18 +451,12 @@ const Admin = () => {
           {kbStatus.rag_system_loaded
             ? "Sistema RAG cargado"
             : "Sistema RAG no cargado"}
-        </Badge>
+        </Badge> */}
 
         {kbStatus.is_generating && (
           <Badge className="px-3 py-1 flex items-center gap-2 bg-blue-100 text-blue-800">
             <RefreshCcw className="w-4 h-4 animate-spin" />
             Generando base de conocimiento
-          </Badge>
-        )}
-
-        {kbStatus.documents_count !== undefined && (
-          <Badge className="px-3 py-1 bg-purple-100 text-purple-800">
-            {kbStatus.documents_count} documentos indexados
           </Badge>
         )}
       </div>
@@ -669,11 +657,16 @@ const Admin = () => {
                             }
                             ${
                               file.status === "processing"
-                                ? "bg-yellow-50 text-yellow-800"
+                                ? "bg-yellow-50 text-yellow-500"
                                 : ""
                             }
                             ${
                               file.status === "processed"
+                                ? "bg-green-50 text-green-500"
+                                : ""
+                            }
+                            ${
+                              file.status === "moved"
                                 ? "bg-green-50 text-green-800"
                                 : ""
                             }
@@ -684,7 +677,17 @@ const Admin = () => {
                             }
                           `}
                         >
-                          {file.status}
+                          {file.status === "uploaded"
+                            ? "Subido a Google Drive"
+                            : file.status === "processing"
+                            ? "Procesando"
+                            : file.status === "processed"
+                            ? "Procesado"
+                            : file.status === "moved"
+                            ? "Aprendido por el chatbot"
+                            : file.status === "error"
+                            ? "Error en subida"
+                            : ""}
                         </Badge>
                       </div>
                     ))}
