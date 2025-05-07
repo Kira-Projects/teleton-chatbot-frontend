@@ -28,7 +28,7 @@ jobs:
             sudo bash -c '
               cd ${{ env.SERVER_DIR }} &&
               git pull &&
-              npm ci --no-audit &&
+              npm install &&
               npm run build &&
               cp -R dist/* ${{ env.DEPLOY_DIR }} &&
               systemctl daemon-reload &&
