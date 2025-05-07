@@ -497,7 +497,6 @@ const Admin = () => {
                   ref={fileInputRef}
                   onChange={handleFileSelect}
                   accept=".pdf,.docx,.xlsx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                  multiple
                   className="hidden"
                   disabled={kbStatus.is_generating || isLoading.uploadingFiles}
                 />
