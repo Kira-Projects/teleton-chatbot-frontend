@@ -1,6 +1,8 @@
 name: Sync to Private Repo
 
 on:
+  push:
+    branches: [ main ] 
   workflow_dispatch:
 
 jobs:
@@ -11,7 +13,7 @@ jobs:
       - name: Checkout Source Repo
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Trae todo el historial
+          fetch-depth: 0
 
       - name: Setup SSH Key
         run: |
@@ -20,29 +22,22 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan github.com >> ~/.ssh/known_hosts
 
-      - name: Set Git Config
+      - name: Clone Destination Repo
         run: |
+          git clone git@github.com:kirovich-ai/teleton-chatbot-frontend.git sync-repo
+
+      - name: Copy Files Except .github/workflows
+        run: |
+          rsync -av --delete --exclude='.github/workflows' ./ ./sync-repo/
+
+      - name: Commit and Push to Destination Repo
+        run: |
+          cd sync-repo
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
-
-      - name: Create Clean Branch Without .github/workflows
-        run: |
-          git checkout -b temp-sync-branch
-          git rm -r --cached .github/workflows || true
-          git restore --staged .github/workflows || true
-          git commit -am "Sync update (excluding workflows)" || echo "No changes to commit"
-
-      - name: Add Private Repo Remote
-        run: |
-          git remote add kirovich git@github.com:kirovich-ai/teleton-chatbot-frontend.git
-
-      - name: Force Push to Private Repo with Retry
-        run: |
+          git add .
+          git commit -m "Sync from organizational repo (excluding workflows)" || echo "No changes to commit"
+          
           for i in {1..5}; do
-            git push -f kirovich temp-sync-branch:main && break || sleep 5
+            git push origin main && break || sleep 5
           done
-
-      - name: Cleanup (Delete Temporary Branch)
-        run: |
-          git checkout main
-          git branch -D temp-sync-branch || true
