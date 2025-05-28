@@ -1,7 +1,5 @@
 name: Deploy Frontend to GCP VM
 on:
-  push:
-    branches: [ main ] 
   workflow_dispatch: 
 env:
   SERVER_DIR: /root/frontend-teleton/teleton-chatbot-frontend

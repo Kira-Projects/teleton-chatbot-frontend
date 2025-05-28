@@ -35,6 +35,10 @@ jobs:
           cd /tmp/sync-repo
           git rm -rf --cached .github/workflows || true
           rm -rf .github/workflows
+      
+      - name: Add Private Repo Remote
+        run: |
+          git remote add kirovich git@github.com:kirovich-ai/teleton-chatbot-frontend.git
 
       - name: Commit and Force Push to Destination Repo
         run: |
@@ -43,4 +47,4 @@ jobs:
           git config user.email "actions@github.com"
           git add .
           git commit -m "Sync from organizational repo (excluding workflows)" || echo "No changes to commit"
-          git push --force origin main
+          git push --force kirovich main
