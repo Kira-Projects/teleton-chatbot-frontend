@@ -1,10 +1,10 @@
-name: Sync to External Repo
+name: Sync to External Repo (Selective)
 
 on:
   workflow_dispatch:
   push:
     branches:
-      - main  # Opcional: para activarlo automáticamente al hacer push en main
+      - main
 
 jobs:
   sync-repo:
@@ -14,7 +14,7 @@ jobs:
       - name: Checkout Source Repo
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Trae todo el historial
+          fetch-depth: 0
 
       - name: Setup SSH Key
         run: |
@@ -23,7 +23,7 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan github.com >> ~/.ssh/known_hosts
 
-      - name: Verify SSH Connection (Optional but useful for debugging)
+      - name: Verify SSH Connection
         run: ssh -T git@github.com || true
 
       - name: Git Config
@@ -36,16 +36,22 @@ jobs:
           git remote add external git@github.com:kirovich-ai/teleton-chatbot-frontend.git
           git remote -v
 
-      - name: Ensure we're on main
-        run: git checkout main
+      - name: Create temporary sync branch
+        run: |
+          git checkout -b sync-temp
 
-      - name: Pull latest from source (avoid conflicts)
-        run: git pull origin main --rebase
+      - name: Remove .github/workflows except allowlisted ones
+        run: |
+          mkdir -p .github/workflows
+          cp .github/workflows/test.yaml .github/workflows/ 2>/dev/null || true  # ejemplo
+          git rm -r --cached .github/workflows || true
+          git add .github/workflows
+          git commit -m "Sync without most workflows" || echo "No changes to commit"
 
-      - name: Push to External Repo (Retry up to 5 times)
+      - name: Push to External Repo (Selective with Retry)
         run: |
           for i in {1..5}; do
-            git push -f external main && break || {
+            git push -f external sync-temp:main && break || {
               echo "Retry $i failed, retrying in 5s..."
               sleep 5
             }
