@@ -8,48 +8,62 @@ on:
 jobs:
   sync-repo:
     runs-on: ubuntu-latest
-
+    
     steps:
       - name: Checkout Source Repo
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
+      
       - name: Setup SSH Key
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.GH_KIROVICH_AI_DEPLOY_KEYS }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan github.com >> ~/.ssh/known_hosts
-
+      
       - name: Set Git Config
         run: |
-          git config user.name "GitHub Actions"
-          git config user.email "actions@github.com"
-
-      - name: Clone Destination Repo into /tmp
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+      
+      - name: Clone Destination Repo
         run: |
           git clone git@github.com:kirovich-ai/teleton-chatbot-frontend.git /tmp/sync-repo
-
-      - name: Sync Files Except .github/workflows
-        run: |
-          rsync -av --delete --exclude='.github/workflows' ./ /tmp/sync-repo/
-
-      - name: Remove .github/workflows directory from git tracking
-        run: |
-          cd /tmp/sync-repo
-          git rm -rf --cached .github/workflows || true
-          rm -rf .github/workflows
       
-      - name: Add Private Repo Remote
+      - name: Sync Files (Excluding Workflows)
         run: |
-          git remote add kirovich git@github.com:kirovich-ai/teleton-chatbot-frontend.git
-
-      - name: Commit and Force Push to Destination Repo
+          # Sincronizar todo excepto .github/workflows
+          rsync -av --delete \
+            --exclude='.git' \
+            --exclude='.github/workflows/' \
+            --exclude='.github/workflows' \
+            ./ /tmp/sync-repo/
+      
+      - name: Clean Up Workflows in Destination
         run: |
           cd /tmp/sync-repo
-          git config user.name "GitHub Actions"
-          git config user.email "actions@github.com"
+          # Remover workflows del tracking de git si existen
+          if [ -d ".github/workflows" ]; then
+            git rm -rf --cached .github/workflows/ 2>/dev/null || true
+            rm -rf .github/workflows/
+          fi
+      
+      - name: Force Commit and Push
+        run: |
+          cd /tmp/sync-repo
+          
+          # Añadir todos los archivos
           git add .
-          git commit -m "Sync from organizational repo (excluding workflows)" || echo "No changes to commit"
-          git push --force kirovich main
+          git add -A
+          
+          # Commit (siempre funciona, incluso sin cambios)
+          if git diff --staged --quiet; then
+            echo "No changes detected, but forcing sync commit"
+            git commit --allow-empty -m "Sync from organizational repo (forced sync - $(date))"
+          else
+            git commit -m "Sync from organizational repo (excluding workflows) - $(date)"
+          fi
+          
+          # Force push para asegurar que siempre funcione
+          git push --force origin main
