@@ -43,7 +43,8 @@ jobs:
       - name: Remove .github/workflows except allowlisted ones
         run: |
           mkdir -p .github/workflows
-          cp .github/workflows/test.yaml .github/workflows/ 2>/dev/null || true  # ejemplo
+          cp .github/workflows/test.yaml .github/workflows/
+          cp .github/workflows/sync-repo.yaml .github/workflows/
           git rm -r --cached .github/workflows || true
           git add .github/workflows
           git commit -m "Sync without most workflows" || echo "No changes to commit"
