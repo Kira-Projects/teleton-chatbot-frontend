@@ -1,6 +1,8 @@
 name: Deploy Frontend to GCP VM
 on:
-  workflow_dispatch: 
+  push:
+    branches: [main]
+  workflow_dispatch:
 env:
   SERVER_DIR: /root/frontend-teleton/teleton-chatbot-frontend
   DEPLOY_DIR: /var/www/teleton/
@@ -9,11 +11,11 @@ jobs:
     name: Build and Deploy
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
-      
+
       - name: Deploy to GCP VM
         uses: appleboy/ssh-action@v1.0.0
         with:

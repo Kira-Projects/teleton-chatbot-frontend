@@ -326,6 +326,10 @@ const Admin = () => {
     setSelectedFiles((prevFiles) => prevFiles.filter((_, i) => i !== index))
   }
 
+  const sleep = (ms) => {
+    return new Promise((resolve) => setTimeout(resolve, ms))
+  }
+
   // Subir archivos seleccionados
   const uploadFiles = async () => {
     if (selectedFiles.length === 0) return
@@ -352,6 +356,7 @@ const Admin = () => {
 
       // Enviar archivos al servidor
       await axios.post(`${API_BASE_URL}/upload-files`, formData, config)
+      await sleep(10000)
 
       // Limpiar lista de archivos seleccionados
       setSelectedFiles([])
@@ -561,8 +566,7 @@ const Admin = () => {
                         </>
                       ) : (
                         <>
-                          <Upload className="mr-2 h-4 w-4" /> Subir{" "}
-                          {selectedFiles.length} archivo(s)
+                          <Upload className="mr-2 h-4 w-4" /> Subir archivo
                         </>
                       )}
                     </Button>
