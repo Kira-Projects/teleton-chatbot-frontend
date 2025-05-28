@@ -2,7 +2,7 @@ name: Sync to Private Repo
 
 on:
   push:
-    branches: [ main ] 
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
@@ -36,14 +36,11 @@ jobs:
           git rm -rf --cached .github/workflows || true
           rm -rf .github/workflows
 
-      - name: Commit and Push to Destination Repo
+      - name: Commit and Force Push to Destination Repo
         run: |
           cd /tmp/sync-repo
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
           git add .
           git commit -m "Sync from organizational repo (excluding workflows)" || echo "No changes to commit"
-          
-          for i in {1..5}; do
-            git push origin main && break || sleep 5
-          done
+          git push --force origin main
