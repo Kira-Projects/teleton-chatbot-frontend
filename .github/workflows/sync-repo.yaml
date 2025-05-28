@@ -1,14 +1,20 @@
-name: Sync Repository to Personal Repo
+name: Sync to External Repo
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main  # Opcional: para activarlo automáticamente al hacer push en main
 
 jobs:
   sync-repo:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout Source Repo
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Trae todo el historial
 
       - name: Setup SSH Key
         run: |
@@ -17,9 +23,30 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan github.com >> ~/.ssh/known_hosts
 
-      - name: Push to Private Repo
+      - name: Verify SSH Connection (Optional but useful for debugging)
+        run: ssh -T git@github.com || true
+
+      - name: Git Config
         run: |
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
-          git remote add kirovich-ai-repo git@github.com:kirovich-ai/teleton-chatbot-frontend.git
-          git push -f -u kirovich-ai-repo main
+
+      - name: Add Remote Repo
+        run: |
+          git remote add external git@github.com:kirovich-ai/teleton-chatbot-frontend.git
+          git remote -v
+
+      - name: Ensure we're on main
+        run: git checkout main
+
+      - name: Pull latest from source (avoid conflicts)
+        run: git pull origin main --rebase
+
+      - name: Push to External Repo (Retry up to 5 times)
+        run: |
+          for i in {1..5}; do
+            git push -f external main && break || {
+              echo "Retry $i failed, retrying in 5s..."
+              sleep 5
+            }
+          done
