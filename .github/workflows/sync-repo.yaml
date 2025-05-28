@@ -22,17 +22,17 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan github.com >> ~/.ssh/known_hosts
 
-      - name: Clone Destination Repo
+      - name: Clone Destination Repo into /tmp
         run: |
-          git clone git@github.com:kirovich-ai/teleton-chatbot-frontend.git sync-repo
+          git clone git@github.com:kirovich-ai/teleton-chatbot-frontend.git /tmp/sync-repo
 
-      - name: Copy Files Except .github/workflows
+      - name: Sync Files Except .github/workflows
         run: |
-          rsync -av --delete --exclude='.github/workflows' ./ ./sync-repo/
+          rsync -av --delete --exclude='.github/workflows' ./ /tmp/sync-repo/
 
       - name: Commit and Push to Destination Repo
         run: |
-          cd sync-repo
+          cd /tmp/sync-repo
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
           git add .
