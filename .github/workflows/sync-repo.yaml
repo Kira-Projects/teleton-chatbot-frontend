@@ -30,6 +30,12 @@ jobs:
         run: |
           rsync -av --delete --exclude='.github/workflows' ./ /tmp/sync-repo/
 
+      - name: Remove .github/workflows directory from git tracking
+        run: |
+          cd /tmp/sync-repo
+          git rm -rf --cached .github/workflows || true
+          rm -rf .github/workflows
+
       - name: Commit and Push to Destination Repo
         run: |
           cd /tmp/sync-repo
