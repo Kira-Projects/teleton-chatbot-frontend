@@ -1,10 +1,7 @@
-name: Sync to External Repo (Selective)
+name: Sync to Private Repo
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
 
 jobs:
   sync-repo:
@@ -14,7 +11,7 @@ jobs:
       - name: Checkout Source Repo
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 0 # Trae todo el historial
 
       - name: Setup SSH Key
         run: |
@@ -23,37 +20,29 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan github.com >> ~/.ssh/known_hosts
 
-      - name: Verify SSH Connection
-        run: ssh -T git@github.com || true
-
-      - name: Git Config
+      - name: Set Git Config
         run: |
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
 
-      - name: Add Remote Repo
+      - name: Create Clean Branch Without .github/workflows
         run: |
-          git remote add external git@github.com:kirovich-ai/teleton-chatbot-frontend.git
-          git remote -v
-
-      - name: Create temporary sync branch
-        run: |
-          git checkout -b sync-temp
-
-      - name: Remove .github/workflows except allowlisted ones
-        run: |
-          mkdir -p .github/workflows
-          cp .github/workflows/test.yaml .github/workflows/
-          cp .github/workflows/sync-repo.yaml .github/workflows/
+          git checkout -b temp-sync-branch
           git rm -r --cached .github/workflows || true
-          git add .github/workflows
-          git commit -m "Sync without most workflows" || echo "No changes to commit"
+          git restore --staged .github/workflows || true
+          git commit -am "Sync update (excluding workflows)" || echo "No changes to commit"
 
-      - name: Push to External Repo (Selective with Retry)
+      - name: Add Private Repo Remote
+        run: |
+          git remote add kirovich git@github.com:kirovich-ai/teleton-chatbot-frontend.git
+
+      - name: Force Push to Private Repo with Retry
         run: |
           for i in {1..5}; do
-            git push -f external sync-temp:main && break || {
-              echo "Retry $i failed, retrying in 5s..."
-              sleep 5
-            }
+            git push -f kirovich temp-sync-branch:main && break || sleep 5
           done
+
+      - name: Cleanup (Delete Temporary Branch)
+        run: |
+          git checkout main
+          git branch -D temp-sync-branch || true
