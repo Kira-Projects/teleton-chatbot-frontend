@@ -487,6 +487,14 @@ const Admin = () => {
             <CardDescription>
               Administra la base de conocimiento del sistema RAG
             </CardDescription>
+            <a
+              className="block text-blue-500 underline"
+              target="_blank"
+              rel="noopener noreferrer"
+              href={`https://drive.google.com/drive/folders/1LYnZlKV7ZMdc8JwBMGsNW2aPPtgERbIU?usp=sharing`}
+            >
+              Ver Archivos desde Google Drive
+            </a>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
@@ -582,9 +590,11 @@ const Admin = () => {
               {/* Lista de archivos subidos */}
               {uploadedFiles.length > 0 && (
                 <div className="space-y-2">
-                  <h3 className="text-sm font-medium">
-                    Documentos subidos ({uploadedFiles.length})
-                  </h3>
+                  <div className="flex items-center">
+                    <h3 className="text-sm font-medium">
+                      Documentos subidos ({uploadedFiles.length})
+                    </h3>
+                  </div>
                   <ScrollArea className="h-[150px] rounded-md border p-2">
                     {uploadedFiles.map((file) => (
                       <div
