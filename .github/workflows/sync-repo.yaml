@@ -1,6 +1,8 @@
 name: Sync to Private Repo
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
 
 jobs:

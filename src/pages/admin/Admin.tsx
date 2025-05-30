@@ -326,7 +326,7 @@ const Admin = () => {
     setSelectedFiles((prevFiles) => prevFiles.filter((_, i) => i !== index))
   }
 
-  const sleep = (ms) => {
+  const sleep = (ms: any) => {
     return new Promise((resolve) => setTimeout(resolve, ms))
   }
 
