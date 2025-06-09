@@ -3,19 +3,16 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
-env:
-  SERVER_DIR: /root/frontend-teleton/teleton-chatbot-frontend
-  DEPLOY_DIR: /var/www/teleton/
+
 jobs:
   deploy:
     name: Build and Deploy
     runs-on: ubuntu-latest
     timeout-minutes: 15
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
-
+      
       - name: Deploy to GCP VM
         uses: appleboy/ssh-action@v1.0.0
         with:
@@ -24,15 +21,252 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           passphrase: ${{ secrets.SSH_PASSPHRASE }}
           script_stop: true
+          timeout: 900s
           script: |
-            sudo bash -c '
-              cd ${{ env.SERVER_DIR }} &&
-              git reset --hard &&
-              git checkout main &&
-              git pull &&
-              npm install &&
-              npm run build &&
-              cp -R dist/* ${{ env.DEPLOY_DIR }} &&
-              systemctl daemon-reload &&
-              systemctl restart nginx
-            '
+            # ===============================================
+            # DEPLOYMENT SCRIPT WITH ERROR HANDLING
+            # ===============================================
+            
+            set -e  # Exit immediately if a command exits with a non-zero status
+            set -u  # Treat unset variables as an error
+            set -o pipefail  # The return value of a pipeline is the status of the last command to exit with a non-zero status
+            
+            # Define variables locally (env vars not available in SSH context)
+            SERVER_DIR="/root/frontend-teleton/teleton-chatbot-frontend"
+            DEPLOY_DIR="/var/www/teleton/"
+            BACKUP_DIR="/var/www/teleton-backup-$(date +%Y%m%d_%H%M%S)"
+            
+            # Function to handle errors
+            error_handler() {
+                local line_number=$1
+                echo "ERROR: Deployment failed at line $line_number"
+                echo "Attempting rollback..."
+                
+                # Rollback if backup exists
+                if [ -d "$BACKUP_DIR" ]; then
+                    echo "Restoring from backup: $BACKUP_DIR"
+                    sudo rm -rf "$DEPLOY_DIR"/*
+                    sudo cp -R "$BACKUP_DIR"/* "$DEPLOY_DIR"/ || echo "WARNING: Rollback failed"
+                    echo "Rollback completed"
+                else
+                    echo "WARNING: No backup found, manual intervention may be required"
+                fi
+                
+                echo "System status:"
+                sudo systemctl status nginx --no-pager -l || true
+                exit 1
+            }
+            
+            # Set up error handling
+            trap 'error_handler $LINENO' ERR
+            
+            echo "Starting deployment process..."
+            echo "Date: $(date)"
+            echo "User: $(whoami)"
+            echo "Server directory: $SERVER_DIR"
+            echo "Deploy directory: $DEPLOY_DIR"
+            echo "Backup directory: $BACKUP_DIR"
+            echo ""
+            
+            # ===============================================
+            # PRE-DEPLOYMENT CHECKS
+            # ===============================================
+            
+            echo "Running pre-deployment checks..."
+            
+            # Check if server directory exists
+            if [ ! -d "$SERVER_DIR" ]; then
+                echo "ERROR: Server directory does not exist: $SERVER_DIR"
+                echo "Available directories in /root:"
+                ls -la /root/ || true
+                exit 1
+            fi
+            echo "Server directory verified"
+            
+            # Check if deploy directory exists, create if not
+            if [ ! -d "$DEPLOY_DIR" ]; then
+                echo "Creating deploy directory: $DEPLOY_DIR"
+                sudo mkdir -p "$DEPLOY_DIR"
+            fi
+            echo "Deploy directory ready"
+            
+            # Check nginx status
+            if ! sudo systemctl is-active --quiet nginx; then
+                echo "WARNING: Nginx is not running, attempting to start..."
+                sudo systemctl start nginx || {
+                    echo "ERROR: Failed to start nginx"
+                    exit 1
+                }
+            fi
+            echo "Nginx service verified"
+            
+            # Check disk space
+            DISK_USAGE=$(df "$DEPLOY_DIR" | awk 'NR==2 {print $5}' | sed 's/%//')
+            if [ "$DISK_USAGE" -gt 90 ]; then
+                echo "WARNING: Disk usage is ${DISK_USAGE}%, deployment may fail"
+            fi
+            echo "Disk usage: ${DISK_USAGE}%"
+            
+            echo ""
+            
+            # ===============================================
+            # CREATE BACKUP
+            # ===============================================
+            
+            echo "Creating backup of current deployment..."
+            if [ "$(sudo ls -A $DEPLOY_DIR 2>/dev/null)" ]; then
+                sudo mkdir -p "$BACKUP_DIR"
+                sudo cp -R "$DEPLOY_DIR"/* "$BACKUP_DIR"/ || {
+                    echo "WARNING: Backup creation failed, continuing anyway..."
+                }
+                echo "Backup created: $BACKUP_DIR"
+            else
+                echo "No existing files to backup"
+            fi
+            echo ""
+            
+            # ===============================================
+            # GIT OPERATIONS
+            # ===============================================
+            
+            echo "Performing Git operations..."
+            cd "$SERVER_DIR"
+            
+            echo "Current directory: $(pwd)"
+            echo "Current branch: $(git branch --show-current)"
+            echo "Repository status:"
+            git status --porcelain
+            
+            echo "Resetting Git state..."
+            git reset --hard
+            
+            echo "Switching to main branch..."
+            git checkout main
+            
+            echo "Pulling latest changes..."
+            git pull
+            
+            echo "Latest commit:"
+            git log --oneline -1
+            echo ""
+            
+            # ===============================================
+            # BUILD PROCESS
+            # ===============================================
+            
+            echo "Starting build process..."
+            
+            echo "Node.js version: $(node --version)"
+            echo "NPM version: $(npm --version)"
+            
+            echo "Installing dependencies..."
+            npm ci || {
+                echo "WARNING: npm ci failed, trying npm install..."
+                npm install
+            }
+            
+            echo "Cleaning previous builds..."
+            rm -rf dist/ || true
+            
+            echo "Building project..."
+            npm run build
+            
+            # Verify build output
+            if [ ! -d "dist" ]; then
+                echo "ERROR: Build failed - dist directory not found"
+                exit 1
+            fi
+            
+            if [ ! "$(ls -A dist/)" ]; then
+                echo "ERROR: Build failed - dist directory is empty"
+                exit 1
+            fi
+            
+            echo "Build completed successfully"
+            echo "Build output:"
+            ls -la dist/ | head -10
+            echo ""
+            
+            # ===============================================
+            # DEPLOYMENT
+            # ===============================================
+            
+            echo "Deploying to production..."
+            
+            echo "Clearing deployment directory..."
+            sudo rm -rf "$DEPLOY_DIR"/*
+            
+            echo "Copying files to deployment directory..."
+            sudo cp -R dist/* "$DEPLOY_DIR"/
+            
+            echo "Setting correct permissions..."
+            sudo chown -R www-data:www-data "$DEPLOY_DIR"
+            sudo chmod -R 755 "$DEPLOY_DIR"
+            
+            echo "Files deployed successfully"
+            echo "Deployed files:"
+            sudo ls -la "$DEPLOY_DIR" | head -10
+            echo ""
+            
+            # ===============================================
+            # SERVICE RESTART
+            # ===============================================
+            
+            echo "Restarting services..."
+            
+            echo "Reloading systemd daemon..."
+            sudo systemctl daemon-reload
+            
+            echo "Restarting nginx..."
+            sudo systemctl restart nginx
+            
+            # Wait a moment for nginx to start
+            sleep 2
+            
+            # Verify nginx is running
+            if ! sudo systemctl is-active --quiet nginx; then
+                echo "ERROR: Nginx failed to restart"
+                sudo systemctl status nginx --no-pager -l
+                exit 1
+            fi
+            
+            echo "Nginx restarted successfully"
+            echo ""
+            
+            # ===============================================
+            # POST-DEPLOYMENT VERIFICATION
+            # ===============================================
+            
+            echo "Running post-deployment verification..."
+            
+            # Check if main files exist
+            if [ ! -f "$DEPLOY_DIR/index.html" ]; then
+                echo "WARNING: index.html not found in deployment directory"
+            else
+                echo "index.html verified"
+            fi
+            
+            # Check nginx status
+            echo "Nginx status:"
+            sudo systemctl status nginx --no-pager -l
+            
+            # Test HTTP response (optional, requires curl)
+            if command -v curl >/dev/null 2>&1; then
+                echo "Testing HTTP response..."
+                HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost/ || echo "000")
+                if [ "$HTTP_STATUS" = "200" ]; then
+                    echo "HTTP test passed (Status: $HTTP_STATUS)"
+                else
+                    echo "WARNING: HTTP test failed (Status: $HTTP_STATUS)"
+                fi
+            fi
+            
+            # Clean up old backups (keep last 5)
+            echo "Cleaning up old backups..."
+            sudo find /var/www/ -name "teleton-backup-*" -type d | sort | head -n -5 | sudo xargs rm -rf 2>/dev/null || true
+            
+            echo ""
+            echo "DEPLOYMENT COMPLETED SUCCESSFULLY"
+            echo "Application available at: http://34.132.204.3"
+            echo "Deployment completed at: $(date)"
+            echo "Backup available at: $BACKUP_DIR"
