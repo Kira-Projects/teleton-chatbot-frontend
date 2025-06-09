@@ -3,19 +3,16 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
-env:
-  SERVER_DIR: /root/frontend-teleton/teleton-chatbot-frontend
-  DEPLOY_DIR: /var/www/teleton/
+
 jobs:
   deploy:
     name: Build and Deploy
     runs-on: ubuntu-latest
     timeout-minutes: 15
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
-
+      
       - name: Deploy to GCP VM
         uses: appleboy/ssh-action@v1.0.0
         with:
@@ -24,15 +21,65 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           passphrase: ${{ secrets.SSH_PASSPHRASE }}
           script_stop: true
+          timeout: 900s
           script: |
+            # Execute entire script with sudo
             sudo bash -c '
-              cd ${{ env.SERVER_DIR }} &&
-              git reset --hard &&
-              git checkout main &&
-              git pull &&
-              npm install &&
-              npm run build &&
-              cp -R dist/* ${{ env.DEPLOY_DIR }} &&
-              systemctl daemon-reload &&
+              set -e
+              set -u
+              set -o pipefail
+              
+              SERVER_DIR="/root/frontend-teleton/teleton-chatbot-frontend"
+              DEPLOY_DIR="/var/www/teleton/"
+              BACKUP_DIR="/var/www/teleton-backup-$(date +%Y%m%d_%H%M%S)"
+              
+              echo "Starting deployment process..."
+              echo "Date: $(date)"
+              echo "User: $(whoami)"
+              echo "Server directory: $SERVER_DIR"
+              echo "Deploy directory: $DEPLOY_DIR"
+              
+              # Check if server directory exists
+              if [ ! -d "$SERVER_DIR" ]; then
+                  echo "ERROR: Server directory does not exist: $SERVER_DIR"
+                  ls -la /root/ || true
+                  exit 1
+              fi
+              echo "Server directory verified"
+              
+              # Create backup if needed
+              if [ "$(ls -A $DEPLOY_DIR 2>/dev/null)" ]; then
+                  mkdir -p "$BACKUP_DIR"
+                  cp -R "$DEPLOY_DIR"/* "$BACKUP_DIR"/ || true
+                  echo "Backup created: $BACKUP_DIR"
+              fi
+              
+              # Git operations
+              cd "$SERVER_DIR"
+              git reset --hard
+              git checkout main
+              git pull
+              
+              # Build process
+              npm ci || npm install
+              rm -rf dist/ || true
+              npm run build
+              
+              # Verify build
+              if [ ! -d "dist" ] || [ ! "$(ls -A dist/)" ]; then
+                  echo "ERROR: Build failed"
+                  exit 1
+              fi
+              
+              # Deploy
+              rm -rf "$DEPLOY_DIR"/*
+              cp -R dist/* "$DEPLOY_DIR"/
+              chown -R www-data:www-data "$DEPLOY_DIR"
+              chmod -R 755 "$DEPLOY_DIR"
+              
+              # Restart services
+              systemctl daemon-reload
               systemctl restart nginx
+              
+              echo "DEPLOYMENT COMPLETED SUCCESSFULLY"
             '
