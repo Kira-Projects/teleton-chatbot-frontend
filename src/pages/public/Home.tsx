@@ -8,12 +8,14 @@ import {
 } from "@/components/ui/sheet"
 import { Menu, X } from "lucide-react"
 import { Link } from "react-router-dom"
+import CopilotChat from "@/components/CopilotChat"
 
 const Home = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
 
   return (
     <div className="min-h-screen relative">
+      <CopilotChat />
       {/* Background Image */}
       <div
         className="fixed inset-0 z-0"
