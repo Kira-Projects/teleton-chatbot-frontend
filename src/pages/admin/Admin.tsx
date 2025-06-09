@@ -1,4 +1,7 @@
-import { useState, useEffect, useRef } from "react"
+/* eslint-disable */
+/* eslint-disable react-refresh/only-export-components */
+
+import { useState, useEffect } from "react"
 import axios from "axios"
 import {
   Card,
@@ -13,18 +16,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import {
-  RefreshCcw,
-  Database,
-  Mail,
-  AlertCircle,
-  Upload,
-  FileText,
-  File,
-  FileSpreadsheet,
-  X,
-} from "lucide-react"
-import { Progress } from "@/components/ui/progress"
+import { RefreshCcw, Database, Mail, AlertCircle } from "lucide-react"
 import { useToast } from "../../hooks/use-toast"
 import { config } from "@/config"
 import KBStatusMonitor from "./KBStatusMonitor" // Import the new component
@@ -68,7 +60,6 @@ const Admin = () => {
   const { toast } = useToast()
 
   // Ref for file input
-  const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Estados para configuración de soporte
   const [supportConfig, setSupportConfig] = useState<SupportConfig>({
@@ -98,20 +89,16 @@ const Admin = () => {
   )
 
   // Estado para KB status (will be updated by the KBStatusMonitor)
-  const [kbStatus, setKbStatus] = useState<KBStatus>({
+  const [, setKbStatus] = useState<KBStatus>({
     is_generating: false,
     rag_system_loaded: false,
     documents_count: 0,
   })
 
   // Estado para archivos seleccionados
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([])
 
   // Estado para archivos subidos
-  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([])
-
-  // Estado para progreso de subida
-  const [uploadProgress, setUploadProgress] = useState(0)
+  const [_, setUploadedFiles] = useState<UploadedFile[]>([])
 
   // Cargar configuración al iniciar
   useEffect(() => {
@@ -190,43 +177,6 @@ const Admin = () => {
     }
   }
 
-  // Generar base de conocimiento
-  const generateKnowledgeBase = async () => {
-    try {
-      setIsLoading({ ...isLoading, generatingKB: true })
-      await axios.post(`${API_BASE_URL}/generate-kb`, {})
-      setMessages({
-        ...messages,
-        generateKB: {
-          text: "Generación de base de conocimiento iniciada",
-          type: "success",
-        },
-      })
-      toast({
-        title: "Proceso iniciado",
-        description: "La generación de la base de conocimiento ha comenzado",
-      })
-      loadUploadedFiles() // Refresh the uploaded files list after starting generation
-    } catch (error) {
-      console.error("Error al iniciar generación de KB:", error)
-      setMessages({
-        ...messages,
-        generateKB: {
-          text: "Error al iniciar generación de base de conocimiento",
-          type: "error",
-        },
-      })
-      toast({
-        title: "Error",
-        description:
-          "No se pudo iniciar la generación de la base de conocimiento",
-        variant: "destructive",
-      })
-    } finally {
-      setIsLoading({ ...isLoading, generatingKB: false })
-    }
-  }
-
   // Cargar consultas sin respuesta
   const loadUnansweredQueries = async () => {
     try {
@@ -275,128 +225,6 @@ const Admin = () => {
   ) => {
     const { name, value } = e.target
     setSupportConfig({ ...supportConfig, [name]: value })
-  }
-
-  // Manejador de selección de archivos
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files
-    if (!files || files.length === 0) return
-
-    // Validar tipos de archivos permitidos
-    const allowedTypes = [
-      "application/pdf", // PDF
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document", // DOCX
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", // XLSX
-    ]
-
-    const validFiles: File[] = []
-    const invalidFiles: string[] = []
-
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i]
-      if (allowedTypes.includes(file.type)) {
-        validFiles.push(file)
-      } else {
-        invalidFiles.push(file.name)
-      }
-    }
-
-    // Mostrar mensaje de error si hay archivos inválidos
-    if (invalidFiles.length > 0) {
-      toast({
-        title: "Archivos no permitidos",
-        description: `Solo se permiten archivos PDF, DOCX y XLSX. Archivos rechazados: ${invalidFiles.join(
-          ", "
-        )}`,
-        variant: "destructive",
-      })
-    }
-
-    // Actualizar lista de archivos seleccionados
-    setSelectedFiles((prevFiles) => [...prevFiles, ...validFiles])
-
-    // Limpiar el input para permitir seleccionar el mismo archivo nuevamente
-    if (fileInputRef.current) {
-      fileInputRef.current.value = ""
-    }
-  }
-
-  // Remover archivo de la lista de seleccionados
-  const removeSelectedFile = (index: number) => {
-    setSelectedFiles((prevFiles) => prevFiles.filter((_, i) => i !== index))
-  }
-
-  const sleep = (ms: any) => {
-    return new Promise((resolve) => setTimeout(resolve, ms))
-  }
-
-  // Subir archivos seleccionados
-  const uploadFiles = async () => {
-    if (selectedFiles.length === 0) return
-
-    try {
-      setIsLoading({ ...isLoading, uploadingFiles: true })
-      setUploadProgress(0)
-
-      // Crear FormData para la subida
-      const formData = new FormData()
-      selectedFiles.forEach((file) => {
-        formData.append("files", file)
-      })
-
-      // Configurar el progreso de la subida
-      const config = {
-        onUploadProgress: (progressEvent: any) => {
-          const percentCompleted = Math.round(
-            (progressEvent.loaded * 100) / progressEvent.total
-          )
-          setUploadProgress(percentCompleted)
-        },
-      }
-
-      // Enviar archivos al servidor
-      await axios.post(`${API_BASE_URL}/upload-files`, formData, config)
-      await sleep(10000)
-
-      // Limpiar lista de archivos seleccionados
-      setSelectedFiles([])
-      setUploadProgress(0)
-
-      // Recargar lista de archivos subidos
-      loadUploadedFiles()
-
-      toast({
-        title: "Archivos subidos",
-        description: `${selectedFiles.length} archivo(s) subidos correctamente`,
-      })
-    } catch (error) {
-      console.error("Error al subir archivos:", error)
-      toast({
-        title: "Error",
-        description: "No se pudieron subir los archivos",
-        variant: "destructive",
-      })
-    } finally {
-      setIsLoading({ ...isLoading, uploadingFiles: false })
-    }
-  }
-
-  // Formatear tamaño de archivo
-  const formatFileSize = (bytes: number): string => {
-    if (bytes < 1024) return bytes + " bytes"
-    else if (bytes < 1048576) return (bytes / 1024).toFixed(1) + " KB"
-    else return (bytes / 1048576).toFixed(1) + " MB"
-  }
-
-  // Obtener icono para tipo de archivo
-  const getFileIcon = (type: string) => {
-    if (type.includes("pdf"))
-      return <FileText className="w-5 h-5 text-red-500" />
-    else if (type.includes("wordprocessingml"))
-      return <File className="w-5 h-5 text-blue-500" />
-    else if (type.includes("spreadsheetml"))
-      return <FileSpreadsheet className="w-5 h-5 text-green-500" />
-    else return <File className="w-5 h-5" />
   }
 
   return (
